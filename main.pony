@@ -89,12 +89,13 @@ actor Game
     _add_block()
     _draw()
 
-  fun ref _merge(row : ROW) =>
-    var rout = Merger((_g(row._1),_g(row._2),_g(row._3),_g(row._4)))
-    _set(row._1, rout._1)
-    _set(row._2, rout._2)
-    _set(row._3, rout._3)
-    _set(row._4, rout._4)
+  fun ref _merge(ridx : ROW) =>
+    let rval : ROW = (_get(ridx._1),_get(ridx._2),_get(ridx._3),_get(ridx._4))
+    var rout = Merger(rval)
+    _set(ridx._1, rout._1)
+    _set(ridx._2, rout._2)
+    _set(ridx._3, rout._3)
+    _set(ridx._4, rout._4)
 
 
   fun ref _left()=>
@@ -147,7 +148,7 @@ actor Game
       if (i % 4) == 0 then
           s.append("-----------------------\n")
       end
-      s.append(_fmt(_g(i)))
+      s.append(_fmt(_get(i)))
       s.append(" ")
       i = i + 1
       if (i % 4) == 0 then
@@ -155,6 +156,7 @@ actor Game
       end
     until i==16 end
     _env.out.print(s.string())
+    _env.out.print("Arrow keys to move. Any other key to quit.")
 
    fun ref _set(i:U32, v : U32) =>
      try
@@ -174,7 +176,7 @@ actor Game
     var hit : U64 =  _rand.int(16 - c)
     var i : U32 = 0
     while i < 16 do
-      let n :U32 = _g(i)
+      let n :U32 = _get(i)
       if (n == 0) then
         if hit == 0 then
           _set(i, if  _rand.int(10) > 0 then 2 else 4 end)
@@ -185,7 +187,7 @@ actor Game
       i = i + 1
     end
 
-  fun _g(i : U32) : U32 =>
+  fun _get(i : U32) : U32 =>
     let i' = i.usize()
     try  _grid(i') else 0  end
 
@@ -209,7 +211,7 @@ actor Game
 actor Main
   new create(env: Env) =>
     let input : Stdin tag = env.input
-    env.out.print("Hello, world!")
+    env.out.print("Welcome to ponylang-2048...")
     let game = Game(env)
     let term = ANSITerm(KeyboardHandler(game), input)
 
