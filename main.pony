@@ -57,6 +57,7 @@ primitive Merger
       | (0,_,_,r._3) => (r._2,r._3<<1,0,0)
       | (0,_,_,_) => (r._2,r._3,r._4,0)
       | (_, r._1, _, r._3) => (r._1<<1, r._3<<1, 0, 0)
+      | (_, r._1, 0, _) => (r._1<<1, r._4, 0, 0)
       | (_, r._1, _, _) => (r._1<<1, r._3, r._4, 0)
       | (_, 0,r._1, _) => (r._1<<1,r._4,0,0)
       | (_, 0,0, r._1) => (r._1<<1,0,0,0)
@@ -78,7 +79,7 @@ actor Game
   let _board : String ref = recover String(1024) end
 
   new create(env: Env)=>
-    _env = consume env
+    _env = consume env    
     _grid = Array[U32](4*4)
     var i : U32 = 0
     while i < 16 do
@@ -207,20 +208,25 @@ actor Game
     _draw()
 
 
-
 actor Main
   new create(env: Env) =>
-    let input : Stdin tag = env.input
-    env.out.print("Welcome to ponylang-2048...")
-    let game = Game(env)
-    let term = ANSITerm(KeyboardHandler(game), input)
+    ifdef "test" then
+      TestMain(env)
+    else
 
-    let notify : StdinNotify iso = object iso
-        let term: ANSITerm = term
-        let _in: Stdin tag = input
-        fun ref apply(data: Array[U8] iso) => term(consume data)
-        fun ref dispose() =>
-          _in.dispose()
-    end
+      let input : Stdin tag = env.input
+      env.out.print("Welcome to ponylang-2048...")
+      let game = Game(env)
+      let term = ANSITerm(KeyboardHandler(game), input)
 
-    input(consume notify)
+      let notify : StdinNotify iso = object iso
+          let term: ANSITerm = term
+          let _in: Stdin tag = input
+          fun ref apply(data: Array[U8] iso) => term(consume data)
+          fun ref dispose() =>
+            _in.dispose()
+      end
+
+      input(consume notify)
+   
+   end
