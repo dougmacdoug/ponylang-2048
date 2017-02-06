@@ -3,10 +3,8 @@ Ponylang 2048 (ANSI terminal)
 @author macdougall.doug@gmail.com
 
 TODO:
-* Startup message
 * win condition
 * lose condition
-* row match unit test
 * finish ANSI color scheme
 * learn more pony, make it better
 **********************************/
@@ -54,6 +52,7 @@ primitive Merger
       | (0,0,_,_) => (r._3,r._4,0,0)
       | (0,_,r._2,_) => (r._2<<1,r._4,0,0)
       | (0,_,0,r._2) => (r._2<<1,0,0,0)
+      | (0,_,0,_) => (r._2,r._4,0,0)
       | (0,_,_,r._3) => (r._2,r._3<<1,0,0)
       | (0,_,_,_) => (r._2,r._3,r._4,0)
       | (_, r._1, _, r._3) => (r._1<<1, r._3<<1, 0, 0)
@@ -61,6 +60,7 @@ primitive Merger
       | (_, r._1, _, _) => (r._1<<1, r._3, r._4, 0)
       | (_, 0,r._1, _) => (r._1<<1,r._4,0,0)
       | (_, 0,0, r._1) => (r._1<<1,0,0,0)
+      | (_, 0,0, _) => (r._1,r._4,0,0)
       | (_, 0,_, r._3) => (r._1, r._3<<1,0,0)
       | (_, 0,_, _) => (r._1, r._3,r._4,0)
       | (_,_,r._2,_) => (r._1, r._2<<1,r._4,0)
@@ -174,10 +174,10 @@ actor Game
 
     if c == 16 then return end
 
-    var hit : U64 =  _rand.int(16 - c)
+    var hit =  _rand.int(16 - c)
     var i : U32 = 0
     while i < 16 do
-      let n :U32 = _get(i)
+      let n = _get(i)
       if (n == 0) then
         if hit == 0 then
           _set(i, if  _rand.int(10) > 0 then 2 else 4 end)
@@ -212,21 +212,21 @@ actor Main
   new create(env: Env) =>
     ifdef "test" then
       TestMain(env)
-    else
+      return
+    end
+// real main follows..
+    let input : Stdin tag = env.input
+    env.out.print("Welcome to ponylang-2048...")
+    let game = Game(env)
+    let term = ANSITerm(KeyboardHandler(game), input)
 
-      let input : Stdin tag = env.input
-      env.out.print("Welcome to ponylang-2048...")
-      let game = Game(env)
-      let term = ANSITerm(KeyboardHandler(game), input)
+    let notify : StdinNotify iso = object iso
+        let term: ANSITerm = term
+        let _in: Stdin tag = input
+        fun ref apply(data: Array[U8] iso) => term(consume data)
+        fun ref dispose() =>
+          _in.dispose()
+    end
 
-      let notify : StdinNotify iso = object iso
-          let term: ANSITerm = term
-          let _in: Stdin tag = input
-          fun ref apply(data: Array[U8] iso) => term(consume data)
-          fun ref dispose() =>
-            _in.dispose()
-      end
-
-      input(consume notify)
+    input(consume notify)
    
-   end
