@@ -3,9 +3,7 @@ Ponylang 2048 (ANSI terminal)
 @author macdougall.doug@gmail.com
 
 TODO:
-* win condition
-* lose condition
-* finish ANSI color scheme
+* clean up this mess
 * learn more pony, make it better
 **********************************/
 
@@ -28,8 +26,10 @@ class  KeyboardHandler is ANSINotify
       _game = game
 
    fun ref apply(term: ANSITerm ref, input: U8 val) =>
-     _game.move(QUIT)
-     term.dispose()
+     if input == 113 then
+       _game.move(QUIT)
+       term.dispose()
+     end
 
    fun ref left(ctrl: Bool, alt: Bool, shift: Bool) =>
       _game.move(LEFT)
@@ -39,8 +39,6 @@ class  KeyboardHandler is ANSINotify
       _game.move(UP)
    fun ref right(ctrl: Bool, alt: Bool, shift: Bool) =>
       _game.move(RIGHT)
-   fun ref closed() =>
-        _game.move(QUIT)
 
 type ROW is (U32,U32,U32,U32)
 
@@ -72,6 +70,11 @@ primitive Merger
       end
 
 actor Game
+  let _top_row : Array[U32] box = [0,1,2,3]
+  let _left_row : Array[U32] box = [0,4,8,12]
+  let _right_row : Array[U32] box = [3,7,11,15]
+  let _bottom_row : Array[U32] box = [12,13,14,15]
+
   embed _grid : Array[U32]
   let _rand : Random = MT(Time.millis())
   let _env : Env
@@ -79,7 +82,7 @@ actor Game
   let _board : String ref = recover String(1024) end
 
   new create(env: Env)=>
-    _env = consume env    
+    _env = consume env
     _grid = Array[U32](4*4)
     var i : U32 = 0
     while i < 16 do
@@ -90,53 +93,54 @@ actor Game
     _add_block()
     _draw()
 
-  fun ref _merge(ridx : ROW) =>
-    let rval : ROW = (_get(ridx._1),_get(ridx._2),_get(ridx._3),_get(ridx._4))
-    var rout = Merger(rval)
-    _set(ridx._1, rout._1)
-    _set(ridx._2, rout._2)
-    _set(ridx._3, rout._3)
-    _set(ridx._4, rout._4)
+    be say(s : String) =>
+      _env.out.print(s)
 
+  fun _merge(start : U32, inc : I32) : (ROW | None) =>
+    var st = start.i32()
+    let rval : ROW = (_get(st),
+                      _get(st + inc),
+                      _get(st + (inc * 2)),
+                      _get(st + (inc * 3)))
+    let rout = Merger(rval)
+    if rout is rval then None else rout end
 
-  fun ref _left()=>
-    let row :Array[U32]= [0,4,8,12]
-    for r in row.values() do
-      _merge( (r,r+1,r+2,r+3) )
+  fun ref _update(start : U32, inc : I32) : Bool =>
+    match _merge(start, inc)
+    | let rout : ROW =>
+        var st = start.i32()
+        _set(st,             rout._1)
+        _set(st +  inc,      rout._2)
+        _set(st + (inc * 2), rout._3)
+        _set(st + (inc * 3), rout._4)
+        true
+    else
+      false
     end
 
-  fun ref _right()  =>
-    let row :Array[U32]= [3,7,11,15]
+  fun ref _shift(row :Array[U32] box, inc : I32) : Bool =>
+    var updated = false
     for r in row.values() do
-      _merge( (r, r-1, r-2, r-3) )
+      if _update(r, inc) then
+        updated = true
+      end
     end
-
-  fun ref _up() =>
-    let row :Array[U32]= [0,1,2,3]
-    for r in row.values() do
-      _merge( (r,r+4,r+8,r+12) )
-    end
-
-  fun ref _down() =>
-    let row :Array[U32]= [12,13,14,15]
-    for r in row.values() do
-      _merge( (r, r-4, r-8, r-12) )
-    end
+    updated
 
   fun _fmt(i : U32) : String =>
     match i
     | 0 => " __ "
-    | 2 => "\x1B[91m  2 \x1B[0m"
-    | 4 => "\x1B[92m  4 \x1B[0m"
-    | 8 => "\x1B[93m  8 \x1B[0m"
-    | 16 => "\x1B[94m 16 \x1B[0m"
-    | 32 => "\x1B[95m 32 \x1B[0m"
-    | 64 => "\x1B[96m 64 \x1B[0m"
-    | 128 => "\x1B[91m128 \x1B[0m"
-    | 256 => "\x1B[91m256 \x1B[0m"
-    | 512 => "\x1B[91m512 \x1B[0m"
-    | 1024 => "\x1B[91m1024\x1B[0m"
-    | 2048 => "\x1B[91m2048\x1B[0m"
+    | 2 => "\x1B[31m  2 \x1B[0m"
+    | 4 => "\x1B[32m  4 \x1B[0m"
+    | 8 => "\x1B[33m  8 \x1B[0m"
+    | 16 => "\x1B[34m 16 \x1B[0m"
+    | 32 => "\x1B[35m 32 \x1B[0m"
+    | 64 => "\x1B[36m 64 \x1B[0m"
+    | 128 => "\x1B[37m128 \x1B[0m"
+    | 256 => "\x1B[41m\x1B[37m256 \x1B[0m"
+    | 512 => "\x1B[42m\x1B[37m512 \x1B[0m"
+    | 1024 => "\x1B[43m\x1B[37m1024\x1B[0m"
+    | 2048 => "\x1B[47m\x1B[35m\x1B[1m\x1B[5m2048\x1B[0m"
     else
       i.string()
     end
@@ -157,21 +161,24 @@ actor Game
       end
     until i==16 end
     _env.out.print(s.string())
-    _env.out.print("Arrow keys to move. Any other key to quit.")
+    _env.out.print("Arrow keys to move. Press (q)uit key to quit.")
 
-   fun ref _set(i:U32, v : U32) =>
+   fun ref _set(i:(I32|U32), v : U32) =>
      try
        _grid.update(i.usize(),v)
      else
        _env.out.print("cant update!")
      end
 
-  fun ref _add_block() =>
-    var c : U64 = 0
-    for v in _grid.values() do
-      c = c + if v == 0 then 0 else 1 end
-    end
+  fun _count() :U64 =>
+     var c : U64 = 0
+     for v in _grid.values() do
+       c = c + if v == 0 then 0 else 1 end
+     end
+     c
 
+  fun ref _add_block() =>
+    let c = _count()
     if c == 16 then return end
 
     var hit =  _rand.int(16 - c)
@@ -188,33 +195,103 @@ actor Game
       i = i + 1
     end
 
-  fun _get(i : U32) : U32 =>
+  fun _get(i : (I32|U32)) : U32 =>
     let i' = i.usize()
     try  _grid(i') else 0  end
 
-  be move(QUIT) =>
+  fun _win() : Bool =>
+    for v in _grid.values() do
+      if v == 2048 then
+        _env.out.print("You win!")
+        return true
+      end
+    end
+    false
+
+  fun _z(rout : ROW) : Bool =>
+    (rout._1 == 0) or (rout._2 == 0) or
+    (rout._3 == 0) or (rout._4 == 0)
+
+  fun _lose() : Bool =>
+    if _grid.size() < 16 then return false end
+
+    for r in _left_row.values() do
+      match _merge(r, 1)
+      | let rout : ROW =>
+        if _z(rout) then
+          return false
+        end
+      end
+    end
+
+    for r in _right_row.values() do
+      match _merge(r, -1)
+      | let rout : ROW =>
+        if _z(rout) then
+          return false
+        end
+      end
+    end
+
+    for r in _top_row.values() do
+      match _merge(r, 4)
+      | let rout : ROW =>
+        if _z(rout) then
+          return false
+        end
+      end
+    end
+
+    for r in _bottom_row.values() do
+      match _merge(r, -4)
+      | let rout : ROW =>
+        if _z(rout) then
+          return false
+        end
+      end
+    end
+   _env.out.print("You lose :(")
+   true
+
+  fun _quit()=>
+    _env.out.print("Exiting.. some terminals may require <ctrl-c>")
     _env.exitcode(0)
     _env.input.dispose()
 
-  be move(m: Move) =>
-    match m
-      | LEFT =>  _left()
-      | RIGHT => _right()
-      | UP =>    _up()
-      | DOWN =>  _down()
-    end
+  be move(QUIT) =>
+    _quit()
 
-    _add_block()
-    _draw()
+  be move(m: Move) =>
+    let updated =
+      match m
+        | LEFT =>  _shift(_left_row, 1)
+        | RIGHT => _shift(_right_row, -1)
+        | UP =>    _shift(_top_row, 4)
+        | DOWN =>  _shift(_bottom_row, -4)
+      else
+        false
+      end
+
+    if _win() then
+      _draw()
+      _quit()
+    else
+      if updated then _add_block() end
+      _draw()
+      if _lose() then
+        _quit()
+      end
+    end
 
 
 actor Main
   new create(env: Env) =>
+    // unit test
     ifdef "test" then
       TestMain(env)
       return
     end
-// real main follows..
+    // else game
     let input : Stdin tag = env.input
     env.out.print("Welcome to ponylang-2048...")
     let game = Game(env)
@@ -224,9 +301,7 @@ actor Main
         let term: ANSITerm = term
         let _in: Stdin tag = input
         fun ref apply(data: Array[U8] iso) => term(consume data)
-        fun ref dispose() =>
-          _in.dispose()
+        fun ref dispose() => _in.dispose()
     end
 
     input(consume notify)
-   
