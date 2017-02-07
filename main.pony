@@ -20,61 +20,70 @@ type Move is (LEFT|RIGHT|UP|DOWN|QUIT)
 
 class  KeyboardHandler is ANSINotify
    let _game : Game tag
-   var _count : U32 = 0
-
    new iso create(game : Game tag) =>
       _game = game
 
    fun ref apply(term: ANSITerm ref, input: U8 val) =>
-     if input == 113 then
+     if input == 113 then // q key
        _game.move(QUIT)
        term.dispose()
      end
 
-   fun ref left(ctrl: Bool, alt: Bool, shift: Bool) =>
-      _game.move(LEFT)
-   fun ref down(ctrl: Bool, alt: Bool, shift: Bool) =>
-      _game.move(DOWN)
-   fun ref up(ctrl: Bool, alt: Bool, shift: Bool) =>
-      _game.move(UP)
-   fun ref right(ctrl: Bool, alt: Bool, shift: Bool) =>
-      _game.move(RIGHT)
+   fun ref left(ctrl: Bool, alt: Bool, shift: Bool)  => _game.move(LEFT)
+   fun ref down(ctrl: Bool, alt: Bool, shift: Bool)  => _game.move(DOWN)
+   fun ref up(ctrl: Bool, alt: Bool, shift: Bool)    => _game.move(UP)
+   fun ref right(ctrl: Bool, alt: Bool, shift: Bool) => _game.move(RIGHT)
 
 type ROW is (U32,U32,U32,U32)
 
 primitive Merger
-    fun tag apply(r : ROW) : ROW =>
-      match r
-      | (0,0,0,_) => (r._4,0,0,0)
-      | (0,0,_,r._3) => (r._3<<1,0,0,0)
-      | (0,0,_,_) => (r._3,r._4,0,0)
-      | (0,_,r._2,_) => (r._2<<1,r._4,0,0)
-      | (0,_,0,r._2) => (r._2<<1,0,0,0)
-      | (0,_,0,_) => (r._2,r._4,0,0)
-      | (0,_,_,r._3) => (r._2,r._3<<1,0,0)
-      | (0,_,_,_) => (r._2,r._3,r._4,0)
-      | (_, r._1, _, r._3) => (r._1<<1, r._3<<1, 0, 0)
-      | (_, r._1, 0, _) => (r._1<<1, r._4, 0, 0)
-      | (_, r._1, _, _) => (r._1<<1, r._3, r._4, 0)
-      | (_, 0,r._1, _) => (r._1<<1,r._4,0,0)
-      | (_, 0,0, r._1) => (r._1<<1,0,0,0)
-      | (_, 0,0, _) => (r._1,r._4,0,0)
-      | (_, 0,_, r._3) => (r._1, r._3<<1,0,0)
-      | (_, 0,_, _) => (r._1, r._3,r._4,0)
-      | (_,_,r._2,_) => (r._1, r._2<<1,r._4,0)
-      | (_,_,0,r._2) => (r._1, r._2<<1,0,0)
-      | (_,_,0,_) => (r._1, r._2,r._4,0)
-      | (_,_,_,r._3) => (r._1, r._2,r._3<<1,0)
-      else
-         r
-      end
+  fun tag apply(r : ROW) : ROW =>
+    match r
+    | (0,0,0,_)            => (r._4,0,0,0)
+    | (0,0,_,r._3)         => (r._3<<1,0,0,0)
+    | (0,0,_,_)            => (r._3,r._4,0,0)
+    | (0,_,r._2,_)         => (r._2<<1,r._4,0,0)
+    | (0,_,0,r._2)         => (r._2<<1,0,0,0)
+    | (0,_,0,_)            => (r._2,r._4,0,0)
+    | (0,_,_,r._3)         => (r._2,r._3<<1,0,0)
+    | (0,_,_,_)            => (r._2,r._3,r._4,0)
+    | (_, r._1, _, r._3)   => (r._1<<1, r._3<<1, 0, 0)
+    | (_, r._1, 0, _)      => (r._1<<1, r._4, 0, 0)
+    | (_, r._1, _, _)      => (r._1<<1, r._3, r._4, 0)
+    | (_, 0,r._1, _)       => (r._1<<1,r._4,0,0)
+    | (_, 0,0, r._1)       => (r._1<<1,0,0,0)
+    | (_, 0,0, _)          => (r._1,r._4,0,0)
+    | (_, 0,_, r._3)       => (r._1, r._3<<1,0,0)
+    | (_, 0,_, _)          => (r._1, r._3,r._4,0)
+    | (_,_,r._2,_)         => (r._1, r._2<<1,r._4,0)
+    | (_,_,0,r._2)         => (r._1, r._2<<1,0,0)
+    | (_,_,0,_)            => (r._1, r._2,r._4,0)
+    | (_,_,_,r._3)         => (r._1, r._2,r._3<<1,0)
+    else
+       r
+    end
+
+interface EdgeRow
+  fun val row() : Array[U32] box
+  fun val inc() : I32
+
+primitive TopRow is EdgeRow
+  fun row() : Array[U32] box => [0,1,2,3]
+  fun inc() : I32 => 4
+
+primitive LeftRow is EdgeRow
+  fun row() : Array[U32] box => [0,4,8,12]
+  fun inc() : I32 => 1
+
+primitive RightRow is EdgeRow
+  fun row() : Array[U32] box => [3,7,11,15]
+  fun inc() : I32 => -1
+
+primitive BottomRow is EdgeRow
+  fun row() : Array[U32] box => [12,13,14,15]
+  fun inc() : I32 =>  -4
 
 actor Game
-  let _top_row : Array[U32] box = [0,1,2,3]
-  let _left_row : Array[U32] box = [0,4,8,12]
-  let _right_row : Array[U32] box = [3,7,11,15]
-  let _bottom_row : Array[U32] box = [12,13,14,15]
-
   embed _grid : Array[U32]
   let _rand : Random = MT(Time.millis())
   let _env : Env
@@ -118,10 +127,10 @@ actor Game
       false
     end
 
-  fun ref _shift(row :Array[U32] box, inc : I32) : Bool =>
+  fun ref _shift_to(edge : EdgeRow val) : Bool =>
     var updated = false
-    for r in row.values() do
-      if _update(r, inc) then
+    for r in edge.row().values() do
+      if _update(r, edge.inc()) then
         updated = true
       end
     end
@@ -208,9 +217,9 @@ actor Game
     end
     false
 
-  fun _no_moves(row: Array[U32] box, inc : I32) : Bool =>
-    for r in row.values() do
-      match _merge(r, inc)
+  fun _no_moves(edge : EdgeRow val) : Bool =>
+    for r in edge.row().values() do
+      match _merge(r, edge.inc())
       | let rout : ROW =>
         if (rout._1 == 0) or (rout._2 == 0) or
             (rout._3 == 0) or (rout._4 == 0) then
@@ -222,10 +231,10 @@ actor Game
 
   fun _lose() : Bool =>
     (_grid.size() >= 16) and
-    _no_moves(_left_row, 1) and
-    _no_moves(_right_row, -1) and
-    _no_moves(_top_row, 4) and
-    _no_moves(_bottom_row, -4)
+    _no_moves(LeftRow) and
+    _no_moves(RightRow) and
+    _no_moves(TopRow) and
+    _no_moves(BottomRow)
 
   fun _quit()=>
     _env.out.print("Exiting.. some terminals may require <ctrl-c>")
@@ -238,10 +247,10 @@ actor Game
   be move(m: Move) =>
     let updated =
       match m
-        | LEFT =>  _shift(_left_row, 1)
-        | RIGHT => _shift(_right_row, -1)
-        | UP =>    _shift(_top_row, 4)
-        | DOWN =>  _shift(_bottom_row, -4)
+      | LEFT =>  _shift_to(LeftRow)
+      | RIGHT => _shift_to(RightRow)
+      | UP =>    _shift_to(TopRow)
+      | DOWN =>  _shift_to(BottomRow)
       else
         false
       end
