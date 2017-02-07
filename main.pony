@@ -11,12 +11,40 @@ use "term"
 use "random"
 use "time"
 
-primitive QUIT
+interface EdgeRow
+  fun val row() : Iterator[U32] ref
+  fun val inc() : I32
+
+primitive TopRow is EdgeRow
+  fun row() : Iterator[U32] ref =>
+    let r : Array[U32] box = [0,1,2,3]
+    r.values()
+  fun inc() : I32 => 4
+
+primitive LeftRow is EdgeRow
+  fun row() : Iterator[U32] ref =>
+    let r : Array[U32] box = [0,4,8,12]
+    r.values()
+  fun inc() : I32 => 1
+
+primitive RightRow is EdgeRow
+  fun row() : Iterator[U32] ref =>
+    let r : Array[U32] box = [3,7,11,15]
+    r.values()
+  fun inc() : I32 => -1
+
+primitive BottomRow is EdgeRow
+  fun row() : Iterator[U32] ref =>
+    let r : Array[U32] box = [12,13,14,15]
+    r.values()
+  fun inc() : I32 =>  -4
+
+
 primitive LEFT
 primitive RIGHT
 primitive UP
 primitive DOWN
-type Move is (LEFT|RIGHT|UP|DOWN|QUIT)
+type Move is (LEFT|RIGHT|UP|DOWN)
 
 class  KeyboardHandler is ANSINotify
    let _game : Game tag
@@ -25,7 +53,6 @@ class  KeyboardHandler is ANSINotify
 
    fun ref apply(term: ANSITerm ref, input: U8 val) =>
      if input == 113 then // q key
-       _game.move(QUIT)
        term.dispose()
      end
 
@@ -62,27 +89,9 @@ primitive Merger
     else
        r
     end
-
-interface EdgeRow
-  fun val row() : Array[U32] box
-  fun val inc() : I32
-
-primitive TopRow is EdgeRow
-  fun row() : Array[U32] box => [0,1,2,3]
-  fun inc() : I32 => 4
-
-primitive LeftRow is EdgeRow
-  fun row() : Array[U32] box => [0,4,8,12]
-  fun inc() : I32 => 1
-
-primitive RightRow is EdgeRow
-  fun row() : Array[U32] box => [3,7,11,15]
-  fun inc() : I32 => -1
-
-primitive BottomRow is EdgeRow
-  fun row() : Array[U32] box => [12,13,14,15]
-  fun inc() : I32 =>  -4
-
+/**
+* Game actor
+*/
 actor Game
   embed _grid : Array[U32]
   let _rand : Random = MT(Time.millis())
@@ -91,7 +100,7 @@ actor Game
   let _board : String ref = recover String(1024) end
 
   new create(env: Env)=>
-    _env = consume env
+    _env = env
     _grid = Array[U32](4*4)
     var i : U32 = 0
     while i < 16 do
@@ -102,15 +111,10 @@ actor Game
     _add_block()
     _draw()
 
-    be say(s : String) =>
-      _env.out.print(s)
-
   fun _merge(start : U32, inc : I32) : (ROW | None) =>
     var st = start.i32()
-    let rval : ROW = (_get(st),
-                      _get(st + inc),
-                      _get(st + (inc * 2)),
-                      _get(st + (inc * 3)))
+    let rval : ROW = (_get(st),             _get(st + inc),
+                      _get(st + (inc * 2)), _get(st + (inc * 3)))
     let rout = Merger(rval)
     if rout is rval then None else rout end
 
@@ -129,7 +133,7 @@ actor Game
 
   fun ref _shift_to(edge : EdgeRow val) : Bool =>
     var updated = false
-    for r in edge.row().values() do
+    for r in edge.row() do
       if _update(r, edge.inc()) then
         updated = true
       end
@@ -160,7 +164,7 @@ actor Game
     var i : U32 = 0
     repeat
       if (i % 4) == 0 then
-          s.append("-----------------------\n")
+          s.append("---------------------\n")
       end
       s.append(_fmt(_get(i)))
       s.append(" ")
@@ -179,7 +183,7 @@ actor Game
        _env.out.print("cant update!")
      end
 
-  fun _count() :U64 =>
+  fun _count() : U64 =>
      var c : U64 = 0
      for v in _grid.values() do
        c = c + if v == 0 then 0 else 1 end
@@ -204,21 +208,16 @@ actor Game
       i = i + 1
     end
 
-  fun _get(i : (I32|U32)) : U32 =>
-    let i' = i.usize()
-    try  _grid(i') else 0  end
+  fun _get(i : (I32|U32)) : U32 => try  _grid(i.usize()) else 0  end
 
   fun _win() : Bool =>
-    for v in _grid.values() do
-      if v == 2048 then
-        _env.out.print("You win!")
-        return true
-      end
+    for v in _grid.values() do 
+      if v == 2048 then return true end
     end
     false
 
   fun _no_moves(edge : EdgeRow val) : Bool =>
-    for r in edge.row().values() do
+    for r in edge.row() do
       match _merge(r, edge.inc())
       | let rout : ROW =>
         if (rout._1 == 0) or (rout._2 == 0) or
@@ -241,9 +240,6 @@ actor Game
     _env.exitcode(0)
     _env.input.dispose()
 
-  be move(QUIT) =>
-    _quit()
-
   be move(m: Move) =>
     let updated =
       match m
@@ -257,10 +253,13 @@ actor Game
 
     if _win() then
       _draw()
+      _env.out.print("You win :)")
       _quit()
     else
-      if updated then _add_block() end
-      _draw()
+      if updated then 
+        _add_block() 
+        _draw()
+      end
       if _lose() then
         _env.out.print("You lose :(")
         _quit()
