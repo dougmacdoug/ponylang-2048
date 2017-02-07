@@ -208,50 +208,24 @@ actor Game
     end
     false
 
-  fun _z(rout : ROW) : Bool =>
-    (rout._1 == 0) or (rout._2 == 0) or
-    (rout._3 == 0) or (rout._4 == 0)
+  fun _no_moves(row: Array[U32] box, inc : I32) : Bool =>
+    for r in row.values() do
+      match _merge(r, inc)
+      | let rout : ROW =>
+        if (rout._1 == 0) or (rout._2 == 0) or
+            (rout._3 == 0) or (rout._4 == 0) then
+              return false
+        end
+      end
+    end
+    true
 
   fun _lose() : Bool =>
-    if _grid.size() < 16 then return false end
-
-    for r in _left_row.values() do
-      match _merge(r, 1)
-      | let rout : ROW =>
-        if _z(rout) then
-          return false
-        end
-      end
-    end
-
-    for r in _right_row.values() do
-      match _merge(r, -1)
-      | let rout : ROW =>
-        if _z(rout) then
-          return false
-        end
-      end
-    end
-
-    for r in _top_row.values() do
-      match _merge(r, 4)
-      | let rout : ROW =>
-        if _z(rout) then
-          return false
-        end
-      end
-    end
-
-    for r in _bottom_row.values() do
-      match _merge(r, -4)
-      | let rout : ROW =>
-        if _z(rout) then
-          return false
-        end
-      end
-    end
-   _env.out.print("You lose :(")
-   true
+    (_grid.size() >= 16) and
+    _no_moves(_left_row, 1) and
+    _no_moves(_right_row, -1) and
+    _no_moves(_top_row, 4) and
+    _no_moves(_bottom_row, -4)
 
   fun _quit()=>
     _env.out.print("Exiting.. some terminals may require <ctrl-c>")
@@ -279,6 +253,7 @@ actor Game
       if updated then _add_block() end
       _draw()
       if _lose() then
+        _env.out.print("You lose :(")
         _quit()
       end
     end
