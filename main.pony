@@ -1,16 +1,12 @@
 /*********************************
 Ponylang 2048 (ANSI terminal)
 @author macdougall.doug@gmail.com
-
-TODO:
-* clean up this mess
-* learn more pony, make it better
 **********************************/
-
 use "term"
 use "random"
 use "time"
 
+// The 4 Edge Rows we merge toward
 interface EdgeRow
   fun val row() : Iterator[U32] ref
   fun val inc() : I32
@@ -35,18 +31,22 @@ primitive BottomRow is EdgeRow
     r.values()
   fun inc() : I32 =>  -4
 
+// Move defines for arrow keys
 primitive LEFT
 primitive RIGHT
 primitive UP
 primitive DOWN
 type Move is (LEFT|RIGHT|UP|DOWN)
 
+/**
+* Called by ANSITerm on keypress. override arrows and apply for quit()
+*/
 class  KeyboardHandler is ANSINotify
    let _game : Game tag
    new iso create(game : Game tag) => _game = game
 
    fun ref apply(term: ANSITerm ref, input: U8 val) =>
-     if input == 113 then
+     if input == 113 then // q key
        _game.quit()
        term.dispose()
      end
@@ -54,9 +54,10 @@ class  KeyboardHandler is ANSINotify
    fun ref down(ctrl: Bool, alt: Bool, shift: Bool)  => _game.move(DOWN)
    fun ref up(ctrl: Bool, alt: Bool, shift: Bool)    => _game.move(UP)
    fun ref right(ctrl: Bool, alt: Bool, shift: Bool) => _game.move(RIGHT)
-
+// tuple for row data
 type ROW is (U32,U32,U32,U32)
 
+// namespace to handle merge matching
 primitive Merger
   fun tag apply(r : ROW) : ROW =>
     match r
@@ -97,7 +98,9 @@ actor Game
     _add_block()
     _add_block()
     _draw()
-
+  /**
+  * merge single row, return None if no merge or movement occurred
+  */
   fun _merge(start : U32, inc : I32) : (ROW | None) =>
     var st = start.i32()
     let rval : ROW = (_get(st),             _get(st + inc),
@@ -105,6 +108,9 @@ actor Game
     let rout = Merger(rval)
     if rout is rval then None else rout end
 
+  /**
+  * merge and save single row, return true if row changed
+  */
   fun ref _update(start : U32, inc : I32) : Bool =>
     match _merge(start, inc)
     | let rout : ROW =>
@@ -118,6 +124,9 @@ actor Game
       false
     end
 
+  /**
+  * merge and save all 4 rows, return true if any row changed
+  */
   fun ref _shift_to(edge : EdgeRow val) : Bool =>
     var updated = false
     for r in edge.row() do
@@ -127,6 +136,7 @@ actor Game
     end
     updated
 
+  // return ANSI color string for value
   fun _fmt(i : U32) : String =>
     match i
     | 0 => " __ "
@@ -145,6 +155,7 @@ actor Game
       i.string()
     end
 
+  // draw the screen
   fun ref _draw() =>
     let s : String ref = _board
     s.truncate(0)
@@ -163,20 +174,23 @@ actor Game
     _env.out.print(s.string())
     _env.out.print("Arrow keys to move. Press (q)uit key to quit.")
 
+// get single grid cell value
+    fun _get(i : (I32|U32)) : U32 => try  _grid(i.usize()) else 0  end
+// update single grid cell value
    fun ref _set(i:(I32|U32), v : U32) =>
      try
        _grid.update(i.usize(),v)
      else
        _env.out.print("cant update!")
      end
-
+// count non-zero cells
   fun _count() : U64 =>
      var c : U64 = 0
      for v in _grid.values() do
        c = c + if v == 0 then 0 else 1 end
      end
      c
-
+// add new grid cell value if possible
   fun ref _add_block() =>
     let c = _count()
     if c == 16 then return end
@@ -193,15 +207,13 @@ actor Game
       end
       i = i + 1
     end
-
-  fun _get(i : (I32|U32)) : U32 => try  _grid(i.usize()) else 0  end
-
+// test win condition
   fun _win() : Bool =>
     for v in _grid.values() do
       if v == 2048 then return true end
     end
     false
-
+// returns false if any cell can be merged or moved
   fun _no_moves(edge : EdgeRow val) : Bool =>
     for r in edge.row() do
       match _merge(r, edge.inc())
@@ -213,19 +225,20 @@ actor Game
       end
     end
     true
-
+// test if no more moves can be made
   fun _lose() : Bool =>
     (_grid.size() >= 16) and
     _no_moves(LeftRow) and
     _no_moves(RightRow) and
     _no_moves(TopRow) and
     _no_moves(BottomRow)
-
+// dispose of input closes ANSI term
+// (fails to close on bash on unbuntu on windows)
   be quit()=>
     _env.out.print("Exiting.. some terminals may require <ctrl-c>")
     _env.exitcode(0)
     _env.input.dispose()
-
+// make a single move
   be move(m: Move) =>
     let updated =
       match m
@@ -251,7 +264,7 @@ actor Game
         quit()
       end
     end
-
+// Entry point
 actor Main
   new create(env: Env) =>
     // unit test
@@ -271,5 +284,5 @@ actor Main
         fun ref apply(data: Array[U8] iso) => term(consume data)
         fun ref dispose() => _in.dispose()
     end
-
+    // block until notify.dispose()
     input(consume notify)
