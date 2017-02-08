@@ -5,6 +5,18 @@ Ponylang 2048 (ANSI terminal)
 use "term"
 use "random"
 use "time"
+use "signals"
+
+use "lib:ncurses"
+use @initscr[None]()
+use @printw[None](s : Pointer[U8] tag)
+use @refresh[None]()
+use @endwin[None]()
+
+primitive NCURSES
+  fun _init() =>
+    @initscr()
+
 
 // The 4 Edge Rows we merge toward
 interface EdgeRow
@@ -47,6 +59,7 @@ class  KeyboardHandler is ANSINotify
 
    fun ref apply(term: ANSITerm ref, input: U8 val) =>
      if input == 113 then // q key
+       @endwin()
        _game.quit()
        term.dispose()
      end
@@ -272,6 +285,10 @@ actor Main
       TestMain(env)
       return
     end
+    //
+    // @printw("Hello World !!!".cstring()): None	/* Print Hello World		  */
+    // @refresh()	: None		/* Print it on to the real screen */
+
     // else game
     let input : Stdin tag = env.input
     env.out.print("Welcome to ponylang-2048...")
