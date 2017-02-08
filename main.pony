@@ -16,29 +16,24 @@ interface EdgeRow
   fun val inc() : I32
 
 primitive TopRow is EdgeRow
-  fun row() : Iterator[U32] ref =>
-    let r : Array[U32] box = [0,1,2,3]
+  fun row() : Iterator[U32] ref => let r : Array[U32] box = [0,1,2,3]
     r.values()
   fun inc() : I32 => 4
 
 primitive LeftRow is EdgeRow
-  fun row() : Iterator[U32] ref =>
-    let r : Array[U32] box = [0,4,8,12]
+  fun row() : Iterator[U32] ref => let r : Array[U32] box = [0,4,8,12]
     r.values()
   fun inc() : I32 => 1
 
 primitive RightRow is EdgeRow
-  fun row() : Iterator[U32] ref =>
-    let r : Array[U32] box = [3,7,11,15]
+  fun row() : Iterator[U32] ref => let r : Array[U32] box = [3,7,11,15]
     r.values()
   fun inc() : I32 => -1
 
 primitive BottomRow is EdgeRow
-  fun row() : Iterator[U32] ref =>
-    let r : Array[U32] box = [12,13,14,15]
+  fun row() : Iterator[U32] ref => let r : Array[U32] box = [12,13,14,15]
     r.values()
   fun inc() : I32 =>  -4
-
 
 primitive LEFT
 primitive RIGHT
@@ -48,14 +43,13 @@ type Move is (LEFT|RIGHT|UP|DOWN)
 
 class  KeyboardHandler is ANSINotify
    let _game : Game tag
-   new iso create(game : Game tag) =>
-      _game = game
+   new iso create(game : Game tag) => _game = game
 
    fun ref apply(term: ANSITerm ref, input: U8 val) =>
-     if input == 113 then // q key
+     if input == 113 then
+       _game.quit()
        term.dispose()
      end
-
    fun ref left(ctrl: Bool, alt: Bool, shift: Bool)  => _game.move(LEFT)
    fun ref down(ctrl: Bool, alt: Bool, shift: Bool)  => _game.move(DOWN)
    fun ref up(ctrl: Bool, alt: Bool, shift: Bool)    => _game.move(UP)
@@ -93,20 +87,13 @@ primitive Merger
 * Game actor
 */
 actor Game
-  embed _grid : Array[U32]
+  embed _grid : Array[U32] = Array[U32].init(0, 16)
   let _rand : Random = MT(Time.millis())
   let _env : Env
-  var _c : U32 =  0
   let _board : String ref = recover String(1024) end
 
   new create(env: Env)=>
     _env = env
-    _grid = Array[U32](4*4)
-    var i : U32 = 0
-    while i < 16 do
-      _grid.push(0)
-      i = i + 1
-    end
     _add_block()
     _add_block()
     _draw()
@@ -197,10 +184,9 @@ actor Game
     var hit =  _rand.int(16 - c)
     var i : U32 = 0
     while i < 16 do
-      let n = _get(i)
-      if (n == 0) then
+      if (_get(i) == 0) then
         if hit == 0 then
-          _set(i, if  _rand.int(10) > 0 then 2 else 4 end)
+          _set(i, if _rand.int(10) > 0 then 2 else 4 end)
           break
         end
         hit = hit - 1
@@ -211,7 +197,7 @@ actor Game
   fun _get(i : (I32|U32)) : U32 => try  _grid(i.usize()) else 0  end
 
   fun _win() : Bool =>
-    for v in _grid.values() do 
+    for v in _grid.values() do
       if v == 2048 then return true end
     end
     false
@@ -235,7 +221,7 @@ actor Game
     _no_moves(TopRow) and
     _no_moves(BottomRow)
 
-  fun _quit()=>
+  be quit()=>
     _env.out.print("Exiting.. some terminals may require <ctrl-c>")
     _env.exitcode(0)
     _env.input.dispose()
@@ -254,18 +240,17 @@ actor Game
     if _win() then
       _draw()
       _env.out.print("You win :)")
-      _quit()
+      quit()
     else
-      if updated then 
-        _add_block() 
+      if updated then
+        _add_block()
         _draw()
       end
       if _lose() then
         _env.out.print("You lose :(")
-        _quit()
+        quit()
       end
     end
-
 
 actor Main
   new create(env: Env) =>
