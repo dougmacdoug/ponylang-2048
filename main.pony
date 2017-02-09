@@ -11,11 +11,10 @@ use "lib:ncurses"
 use @initscr[None]()
 use @printw[None](s : Pointer[U8] tag)
 use @refresh[None]()
+use @getch[U8]()
 use @endwin[None]()
 
 primitive NCURSES
-  fun _init() =>
-    @initscr()
 
 
 // The 4 Edge Rows we merge toward
@@ -285,10 +284,13 @@ actor Main
       TestMain(env)
       return
     end
-    //
-    // @printw("Hello World !!!".cstring()): None	/* Print Hello World		  */
-    // @refresh()	: None		/* Print it on to the real screen */
+    @initscr()
 
+
+    @printw("Hello World !!!".cstring())	/* Print Hello World		  */
+    @refresh()		/* Print it on to the real screen */
+    @getch()
+    @endwin()
     // else game
     let input : Stdin tag = env.input
     env.out.print("Welcome to ponylang-2048...")
