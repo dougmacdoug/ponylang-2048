@@ -12,22 +12,22 @@ interface EdgeRow
   fun val inc() : I32
 
 primitive TopRow is EdgeRow
-  fun row() : Iterator[U32] ref => let r : Array[U32] box = [0,1,2,3]
+  fun row() : Iterator[U32] ref => let r : Array[U32] box = [0;1;2;3]
     r.values()
   fun inc() : I32 => 4
 
 primitive LeftRow is EdgeRow
-  fun row() : Iterator[U32] ref => let r : Array[U32] box = [0,4,8,12]
+  fun row() : Iterator[U32] ref => let r : Array[U32] box = [0;4;8;12]
     r.values()
   fun inc() : I32 => 1
 
 primitive RightRow is EdgeRow
-  fun row() : Iterator[U32] ref => let r : Array[U32] box = [3,7,11,15]
+  fun row() : Iterator[U32] ref => let r : Array[U32] box = [3;7;11;15]
     r.values()
   fun inc() : I32 => -1
 
 primitive BottomRow is EdgeRow
-  fun row() : Iterator[U32] ref => let r : Array[U32] box = [12,13,14,15]
+  fun row() : Iterator[U32] ref => let r : Array[U32] box = [12;13;14;15]
     r.values()
   fun inc() : I32 =>  -4
 
@@ -171,15 +171,16 @@ actor Game
           s.append("\n")
       end
     until i==16 end
+    _env.out.print("\x1B[2J")
     _env.out.print(s.string())
     _env.out.print("Arrow keys to move. Press (q)uit key to quit.")
 
 // get single grid cell value
-    fun _get(i : (I32|U32)) : U32 => try  _grid(i.usize()) else 0  end
+    fun _get(i : (I32|U32)) : U32 => try  _grid(i.usize())? else 0  end
 // update single grid cell value
    fun ref _set(i:(I32|U32), v : U32) =>
      try
-       _grid.update(i.usize(),v)
+       _grid.update(i.usize(),v)?
      else
        _env.out.print("cant update!")
      end
@@ -246,9 +247,7 @@ actor Game
       | RIGHT => _shift_to(RightRow)
       | UP =>    _shift_to(TopRow)
       | DOWN =>  _shift_to(BottomRow)
-      else
-        false
-      end
+     end
 
     if _win() then
       _draw()
